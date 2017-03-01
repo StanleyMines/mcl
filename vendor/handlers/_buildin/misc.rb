@@ -10,11 +10,9 @@ module Mcl
   # !idea [target]
   # !strike [target]
   # !longwaydown [target]
-
   # !muuhhh [target]
   class HMclMisc < Handler
     def setup
-      register_ping(:guest)
       register_clear(:guest)
       register_id(:guest)
       register_colors(:guest)
@@ -25,15 +23,6 @@ module Mcl
       register_strike(:mod)
       register_longwaydown(:builder)
       register_muuhhh(:mod)
-    end
-
-    def register_ping acl_level
-      register_command :ping, desc: "pongs you back and advertises self self self self self....", acl: acl_level do |player, args|
-        target = args.first || player
-        trawt(target, "MCL", {text: "Minecraft Listener (short MCL) here!", color: "gold", bold: true})
-        trawt(target, "MCL", {text: "I'm your loyal server wrapper written in ", color: "yellow"}, {text: "Ruby", color: "aqua"}, {text: "!", color: "yellow"})
-        trawt(target, "MCL", {text: "Find me @ ", color: "yellow"}, {text: "https://mcl.breitzeit.de", underlined: true, color: "", hoverEvent: {action: "show_text", value: "click me!"}, clickEvent:{action: "open_url", value: "https://mcl.breitzeit.de"}})
-      end
     end
 
     def register_clear acl_level
@@ -75,7 +64,7 @@ module Mcl
 
           # etype
           entity = args.shift
-          types = %w[MinecartChest EyeOfEnderSignal ItemFrame MinecartCommandBlock Item EntityHorse Fireball EnderDragon MinecartTNT Villager ThrownPotion Guardian SnowMan LeashKnot Arrow MushroomCow LavaSlime Zombie MinecartSpawner EnderCrystal Snowball Enderman CaveSpider MinecartHopper XPOrb ThrownExpBottle FireworksRocketEntity Chicken FallingSand Giant VillagerGolem PrimedTnt Endermite Creeper Rabbit ThrownEnderpearl Silverfish ArmorStand Squid Skeleton SmallFireball MinecartRideable Wolf Witch Ozelot Cow Slime Painting Pig MinecartFurnace Bat Blaze WitherBoss PigZombie Spider Ghast Sheep WitherSkull Boat LightningBolt]
+          types = %w[AreaEffectCloud ArmorStand Arrow Bat Blaze Boat Spider CaveSpider Chicken Cow Creeper DragonFireball EnderCrystal EnderDragon Enderman Endermite EntityHorse EyeOfEnderSignal FallingSand Fireball FireworksRocketEntity Ghast Giant Guardian Item ItemFrame Slime LavaSlime LeashKnot LightningBolt MinecartRideable MinecartChest MinecartCommandBlock MinecartFurnace MinecartHopper MinecartSpawner MinecartTNT MushroomCow Ozelot Painting Pig PigZombie PrimedTnt Rabbit Sheep Shulker ShulkerBullet Silverfish Skeleton SmallFireball SnowMan Snowball SpectralArrow Squid ThrownEgg ThrownEnderpearl ThrownExpBottle ThrownPotion Villager VillagerGolem Witch WitherBoss WitherSkull Wolf XPOrb Zombie]
           etype = types.grep(/#{entity}/i).first || entity
 
           if !(!pmemo(player)[:danger_mode] && amount > 500 && require_danger_mode(player, "Summoning >500 entities require danger mode to be enabled!"))
@@ -97,10 +86,11 @@ module Mcl
 
     def register_rec acl_level
       register_command :rec, desc: "plays music discs", acl: acl_level do |player, args|
+        voice = args.delete("-v")
         if args[0].present?
-          $mcl.server.invoke %{/execute #{player} ~ ~ ~ playsound records.#{args[0]} #{player} ~ ~ ~ 10000 #{args[1] || 1} 1}
+          $mcl.server.invoke %{/execute #{player} ~ ~ ~ playsound #{playsound_broken "record", "records"}.#{args[0]} #{playsound_broken(voice ? "voice" : "record", nil)} #{player} ~ ~ ~ 10000 #{args[1] || 1} 1}
         else
-          trawm(player, {text: "Usage: ", color: "gold"}, {text: "!rec <track> [pitch]", color: "yellow"})
+          trawm(player, {text: "Usage: ", color: "gold"}, {text: "!rec <track> [pitch] [-v]", color: "yellow"})
           trawm(player, {text: "Tracks: ", color: "gold"}, {text: "11 13 blocks cat chirp far mall mellohi stal strad wait ward", color: "yellow"})
         end
       end

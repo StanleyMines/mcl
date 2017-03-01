@@ -1,7 +1,7 @@
 module Mcl
   class ConsoleServer
     class Shell
-      attr_reader :session, :server, :app
+      attr_reader :session, :server, :app, :started, :authenticated, :login
       attr_accessor :colorize, :env, :mem
       include Colorize
       include Commands
@@ -11,11 +11,22 @@ module Mcl
         @session = session
         @server = @session.server
         @app = @server.app
+        @login = []
         @colorize = true
         @protocol = false
+        @started = false
+        @authenticated = false
         @env = {}
         @mem = {}
       end
+
+      def authenticate!
+        @authenticated = true
+      end
+
+
+      # --------------------------------
+
 
       def encode_env data
         JSON.generate(data)
@@ -64,11 +75,11 @@ module Mcl
       end
 
       def push_log msg
-        puts "#{msg}".chomp unless @env["livelog"] == false
+        puts "#{msg}".chomp if @authenticated && @started && @env["livelog"] != false
       end
 
       def push_mlog msg
-        puts "#{msg}".chomp unless @env["livemlog"] == false
+        puts "#{msg}".chomp if @authenticated && @started && @env["livemlog"] != false
       end
 
       # handle user input message
@@ -76,17 +87,22 @@ module Mcl
         str = str.chomp
         app.devlog "[ConsoleServer] #{session.client_id} invoked `#{str}'", scope: "console_server"
 
+        if !@authenticated
+
+          return # do not remove this or I kill you!
+        end
+
         if str.start_with?("\0") # Protocol
           @protocol = true
           _handle_protocol(str)
         elsif str.strip.empty?
           # no input => discard
         elsif str.start_with?("!") # MCL command
-          _invoke_mcl(str)
+          _invoke_mcl(str[1..-1].strip)
         elsif str.start_with?("/") # MC command
-          _invoke_mc(str)
+          _invoke_mc(str[1..-1].strip)
         elsif str.start_with?(".") # say shortcut
-          _cmd_say(str)
+          _cmd_say(str[1..-1].strip)
         else # lookup command
           chunks = str.split(" ")
           if respond_to?("_cmd_#{chunks[0]}")
@@ -103,10 +119,10 @@ module Mcl
             puts c("! Unknown command `#{chunks[0]}', type `commands' to get a list.", :red)
           end
         end
-      rescue
-        puts c("#{$!.class}: #{$!.message}", :red)
-        puts c("#{$@.first}", :red)
-        app.log.warn "[ConsoleServer] #{session.client_id} - failed to handle `#{str}' (#{$!.class}: #{$!.message})"
+      rescue StandardError => ex
+        puts c("#{ex.class}: #{ex.message}", :red)
+        ex.backtrace[0..2].each{|l| puts c("#{l}", :red) } unless ex.is_a?(AccessViolationError)
+        app.log.warn "[ConsoleServer] #{session.client_id} - failed to handle `#{str}' (#{ex.class}: #{ex.message})"
       ensure
         protocol "ack/input:#{str}"
       end
@@ -157,8 +173,15 @@ module Mcl
       # = API =
       # =======
       def hello
-        banner
-        protocol "session/state:ready", true
+        @authenticated = true if !@authenticated && !server.authentication_required?
+
+        if @authenticated
+          banner
+          protocol "session/state:ready", true
+        else
+          print c("login: ", :cyan)
+        end
+        @started = true
       end
 
       def goodbye reason = "no apparent reason"

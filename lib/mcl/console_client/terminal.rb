@@ -6,19 +6,34 @@ module Mcl
       include History
       include Environment
       include Commands
+      include ClientOptions
 
       # Prefix to use for terminal commands (will not be forwared to the remote)
       TCOM_PREF = "?"
 
       def terminal_init
-        @prompt = ->(_){ "%{green}%{ps1}%{red}> " }
-        @ps1 = ->(_){ "%{instance_nd}" }
+        @opts[:mode] = "vi"
+        @opts[:prompt] = "%{green}%{ps1}%{red}> "
+        @opts[:ps1] = "%{instance_nd}"
+        @opts = @opts.merge(load_client_options) if respond_to?(:load_client_options) && !$cc_forced_settings
+        terminal_reset
         @spool = Queue.new
         debug "TCOM_PREF is `#{TCOM_PREF}'"
         $cc_acknowledged = _protocol_message "session/identify:#{CLIENT_NAME}"
       end
 
+      def terminal_reset
+        @prompt = ->(_){ @opts[:prompt] }
+        @ps1 = ->(_){ @opts[:ps1] }
+
+        case @opts[:mode]
+          when "vi" then Readline.vi_editing_mode
+          when "emacs" then Readline.emacs_editing_mode
+        end
+      end
+
       def terminal_run
+        print_line(c("[INFO] ", :green) << c("See local terminal help with ") << c("?help", :magenta) << c(" or just ") << c("?", :magenta))
         load_history
         transport_connect
         output_proc
@@ -42,7 +57,11 @@ module Mcl
             begin
               save_history
             ensure
-              clear_buffer
+              begin
+                clear_buffer
+              ensure
+                save_client_options(@opts.except(:dispatch)) if respond_to?(:save_client_options) && !$cc_forced_settings
+              end
             end
           end
         end
@@ -68,15 +87,15 @@ module Mcl
       end
 
       def _color_cprompt str
-        str.gsub("%{black}",   @colorize ? "\e[30m" : "")
-           .gsub("%{red}",     @colorize ? "\e[31m" : "")
-           .gsub("%{green}",   @colorize ? "\e[32m" : "")
-           .gsub("%{yellow}",  @colorize ? "\e[33m" : "")
-           .gsub("%{blue}",    @colorize ? "\e[34m" : "")
-           .gsub("%{magenta}", @colorize ? "\e[35m" : "")
-           .gsub("%{cyan}",    @colorize ? "\e[36m" : "")
-           .gsub("%{white}",   @colorize ? "\e[37m" : "")
-           .gsub("%{reset}",   @colorize ? "\e[0m" : "")
+        str.gsub("%{black}",   colorize? ? "\e[30m" : "")
+           .gsub("%{red}",     colorize? ? "\e[31m" : "")
+           .gsub("%{green}",   colorize? ? "\e[32m" : "")
+           .gsub("%{yellow}",  colorize? ? "\e[33m" : "")
+           .gsub("%{blue}",    colorize? ? "\e[34m" : "")
+           .gsub("%{magenta}", colorize? ? "\e[35m" : "")
+           .gsub("%{cyan}",    colorize? ? "\e[36m" : "")
+           .gsub("%{white}",   colorize? ? "\e[37m" : "")
+           .gsub("%{reset}",   colorize? ? "\e[0m" : "")
       end
 
       def output_proc
@@ -165,6 +184,7 @@ module Mcl
           debug "Ignored stale request #{buf}".chomp
           $cc_acknowledged = nil
         else
+          return if buf.blank?
           $cc_acknowledged = "#{buf}".chomp
           handle_line(buf)
         end

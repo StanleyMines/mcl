@@ -8,7 +8,7 @@ module Mcl
       @mutex = Monitor.new
       @instance = instance
       @graceful = []
-      @ipc_earlies = []
+      @ipc_earlies = {}
       @promises = []
       @event_backlog = []
       @delayed = []
@@ -19,6 +19,9 @@ module Mcl
       begin
         ensure_directories
         setup_logger
+
+        # debug environment
+        debug_env
 
         # save booted version
         @booted_mcl_rev = Mcl.git_message
@@ -41,6 +44,27 @@ module Mcl
         Thread.main[:mcl_original_exception] = nil
         raise
       end
+    end
+
+    def debug_env
+      log.debug "[ENV]             PATH: #{ENV["PATH"]}"
+      log.debug "[ENV]      GIT_VERSION: #{`git --version`.chomp}"
+      log.debug "[ENV]     RUBY_VERSION: #{RUBY_VERSION}"
+      log.debug "[ENV] RUBY_DESCRIPTION: #{RUBY_DESCRIPTION}"
+      log.debug "[ENV]         RUBY_BIN: #{debug_which "ruby"}"
+      log.debug "[ENV]       MCL COMMIT: #{Mcl.git_message}"
+      log.debug "[ENV]          MCL SHA: #{Mcl.git_sha}"
+    end
+
+    def debug_which(cmd)
+      exts = ENV['PATHEXT'] ? ENV['PATHEXT'].split(';') : ['']
+      ENV['PATH'].split(File::PATH_SEPARATOR).each do |path|
+        exts.each { |ext|
+          exe = File.join(path, "#{cmd}#{ext}")
+          return exe if File.executable?(exe) && !File.directory?(exe)
+        }
+      end
+      return nil
     end
 
     def loop!
@@ -74,13 +98,13 @@ module Mcl
       end
     end
 
-    def ipc_early &block
-      @ipc_earlies.unshift block
+    def ipc_early name, &block
+      @ipc_earlies[name] = block
     end
 
     def ipc_early_hooks
       log.debug "Running early hooks..."
-      @ipc_earlies.each do |task|
+      @ipc_earlies.each do |name, task|
         begin
           task.call
         rescue
@@ -156,7 +180,9 @@ module Mcl
 
     def spool_event ev
       @event_backlog << ev
-      @event_backlog = @event_backlog.last(@config["event_backlog"] || 100)
+      while @event_backlog.length > (@config["event_backlog"] || 100)
+        @event_backlog.shift
+      end
     end
 
     def log_backlog lines = 100

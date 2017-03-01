@@ -23,15 +23,44 @@ module Mcl
       register_command :whereis, desc: "shows you the position of a player", acl: acl_level do |player, args|
         target = args.first || player
 
-        detect_player_position(target) do |pos|
-          if pos
+        detect_player_position(target) do |p1|
+          if p1
             trawt(player, "NSA",
               {text: "Player ", color: "green"},
               {text: target, color: "aqua", hoverEvent: {action: "show_text", value: "teleport to #{target}"}, clickEvent: {action: "run_command", value: "!tp #{target}"}},
               {text: " is at ", color: "green"},
-              {text: pos.join(" "), color: "aqua", hoverEvent: {action: "show_text", value: "teleport to #{pos.join(" ")}"}, clickEvent: {action: "run_command", value: "!tp #{pos.join(" ")}"}},
+              {text: p1.join(" "), color: "aqua", hoverEvent: {action: "show_text", value: "teleport to #{p1.join(" ")}"}, clickEvent: {action: "run_command", value: "!tp #{p1.join(" ")}"}},
               {text: "!", color: "green"}
             )
+
+            # detect issuer position for distance measurement
+            detect_player_position(player) do |p2|
+              if p2
+                distance = coord_distance(p2, p1)
+                direction = coord_direction(p2, p1)
+
+                # message
+                trawt(player, "NSA",
+                  {text: "This is ", color: "yellow"},
+                  {text: "#{distance.to_i} meters ", color: "gold"},
+                  {text: "in ", color: "yellow"},
+                  {text: coord_direction_str(direction), color: "gold"},
+                  {text: " direction.", color: "yellow"}
+                )
+
+                # particle indicator
+                particles, spacing = case distance
+                  when 0 then [0, 0]
+                  when 1...20 then [[distance.to_i, 5].min, distance > 10 ? 2 : 0]
+                  when 20...100 then [10, 3]
+                  else [20, 5]
+                end
+
+                direction_indicator_points(p2, direction, particles, spacing).each do |point|
+                  indicate_coord player, point, :barrier
+                end
+              end
+            end
           else
             trawt(player, "NSA", {text: "Couldn't determine position of #{target} :/ Maybe the target is underwater.", color: "red"})
           end
@@ -47,53 +76,53 @@ module Mcl
 
       def nsarp_playtime tmem
         [].tap do |r|
-          r << %Q{{text: "#{tmem.nickname}", color: "red", underlined: true}}
+          r << %Q{{"text": "#{tmem.nickname}", "color": "red", "underlined": true}}
 
           # online
-          r << %Q{{text: "\\nOnline: ", color: "dark_blue"}}
+          r << %Q{{"text": "\\nOnline: ", "color": "dark_blue"}}
           if tmem.online?
-            r << %Q{{text: "Yes", color: "dark_green"}}
+            r << %Q{{"text": "Yes", "color": "dark_green"}}
           else
-            r << %Q{{text: "No", color: "dark_red"}}
+            r << %Q{{"text": "No", "color": "dark_red"}}
           end
 
           # MCBans status
-          tmp = %Q{, hoverEvent:{action:"show_text",value:"Click to open MCBans site"},clickEvent:{action:"open_url", value:"http://mcbans.com/player/#{tmem.nickname}"}}
-          r << %Q{{text: "\\nMCBans: ", color: "dark_blue"}}
+          tmp = %Q{, "hoverEvent":{"action":"show_text","value":"Click to open MCBans site"},clickEvent:{"action":"open_url", "value":"http://mcbans.com/player/#{tmem.nickname}"}}
+          r << %Q{{"text": "\\nMCBans: ", "color": "dark_blue"}}
           if MCBANS_APIKEY.present?
             mcbd = mcbans_data(tmem)
             if mcbd[:status] == "n"
-              r << %Q{{text: "OK", color: "dark_green"#{tmp}}}
+              r << %Q{{"text": "OK", "color": "dark_green"#{tmp}}}
             else
-              r << %Q{{text: "WARN", color: "dark_red"#{tmp}}}
+              r << %Q{{"text": "WARN", "color": "dark_red"#{tmp}}}
             end
           else
-            r << %Q{{text: "No API key", color: "gray"#{tmp}}}
+            r << %Q{{"text": "No API key", "color": "gray"#{tmp}}}
           end
 
           # permission
           perm = pman.lvlname(tmem.permission)
-          r << %Q{{text: "\\nPermission: ", color: "dark_blue"}}
-          r << %Q{{text: "#{perm}", color: "dark_aqua"}}
+          r << %Q{{"text": "\\nPermission: ", "color": "dark_blue"}}
+          r << %Q{{"text": "#{perm}", "color": "dark_aqua"}}
 
           # connects
-          r << %Q{{text: "\\nConnects: ", color: "dark_blue"}}
-          r << %Q{{text: "#{tmem[:data][:connects]}", color: "dark_aqua"}}
+          r << %Q{{"text": "\\nConnects: ", "color": "dark_blue"}}
+          r << %Q{{"text": "#{tmem[:data][:connects]}", "color": "dark_aqua"}}
 
           # playtime
-          r << %Q{{text: "\\nPlaytime: ", color: "dark_blue"}}
-          r << %Q{{text: "#{tmem.fplaytime(tmem.online)}", color: "dark_aqua"}}
+          r << %Q{{"text": "\\nPlaytime: ", "color": "dark_blue"}}
+          r << %Q{{"text": "#{tmem.fplaytime(tmem.online)}", "color": "dark_aqua"}}
 
           # first connect
           if tmem.first_connect
-            r << %Q{{text: "\\nFirst connect:\\n", color: "dark_blue"}}
-            r << %Q{{text: "#{tmem.first_connect.strftime("%F %T")} (#{Player.fseconds(Time.current - tmem.first_connect)})", color: "dark_aqua"}}
+            r << %Q{{"text": "\\nFirst connect:\\n", "color": "dark_blue"}}
+            r << %Q{{"text": "#{tmem.first_connect.strftime("%F %T")} (#{Player.fseconds(Time.current - tmem.first_connect)})", "color": "dark_aqua"}}
           end
 
           # last connect
           if tmem.last_connect
-            r << %Q{{text: "\\nLast connect:\\n", color: "dark_blue"}}
-            r << %Q{{text: "#{tmem.last_connect.strftime("%F %T")} (#{Player.fseconds(Time.current - tmem.last_connect)})", color: "dark_aqua"}}
+            r << %Q{{"text": "\\nLast connect:\\n", "color": "dark_blue"}}
+            r << %Q{{"text": "#{tmem.last_connect.strftime("%F %T")} (#{Player.fseconds(Time.current - tmem.last_connect)})", "color": "dark_aqua"}}
           end
         end.join("\n")
       end
@@ -102,44 +131,44 @@ module Mcl
         ipd = ip_data(tmem) || {}
         [].tap do |r|
           if ipd["ip"]
-            r << %Q{{text: "IP: ", color: "dark_blue"}}
-            r << %Q{{text: "#{ipd["ip"]}", color: "dark_aqua"}}
+            r << %Q{{"text": "IP: ", "color": "dark_blue"}}
+            r << %Q{{"text": "#{ipd["ip"]}", "color": "dark_aqua"}}
           end
 
           if ipd["hostname"]
-            r << %Q{{text: "\\nHostname:\\n", color: "dark_blue"}}
-            r << %Q{{text: "#{ipd["hostname"]}", color: "dark_aqua"}}
+            r << %Q{{"text": "\\nHostname:\\n", "color": "dark_blue"}}
+            r << %Q{{"text": "#{ipd["hostname"]}", "color": "dark_aqua"}}
           end
 
           if ipd["country"]
-            r << %Q{{text: "\\nCountry: ", color: "dark_blue"}}
-            r << %Q{{text: "#{ipd["country"]}", color: "dark_aqua"}}
+            r << %Q{{"text": "\\nCountry: ", "color": "dark_blue"}}
+            r << %Q{{"text": "#{ipd["country"]}", "color": "dark_aqua"}}
           end
 
           if ipd["city"]
-            r << %Q{{text: "\\nCity: ", color: "dark_blue"}}
-            r << %Q{{text: "#{ipd["city"]}", color: "dark_aqua"}}
+            r << %Q{{"text": "\\nCity: ", "color": "dark_blue"}}
+            r << %Q{{"text": "#{ipd["city"]}", "color": "dark_aqua"}}
           end
 
           if ipd["org"]
-            r << %Q{{text: "\\nProvider: ", color: "dark_blue"}}
-            r << %Q{{text: "#{ipd["org"]}", color: "dark_aqua"}}
+            r << %Q{{"text": "\\nProvider: ", "color": "dark_blue"}}
+            r << %Q{{"text": "#{ipd["org"]}", "color": "dark_aqua"}}
           end
 
-          r << %Q{{text: "\\n» ip info", color: "dark_purple", underlined: true, hoverEvent:{action:"show_text",value:"Click to open"},clickEvent:{action:"open_url", value:"http://ipinfo.io/#{ipd["ip"]}"}}}
+          r << %Q{{"text": "\\n» ip info", "color": "dark_purple", "underlined": true, "hoverEvent":{"action":"show_text","value":"Click to open"},"clickEvent":{"action":"open_url", "value":"http://ipinfo.io/#{ipd["ip"]}"}}}
         end.join("\n")
       end
 
       def nsarp_misc tmem
         [].tap do |r|
           # uuid
-          r << %Q{{text: "UUID:\\n", color: "dark_blue"}}
-          r << %Q{{text: "#{tmem.uuid || "???"}\\n\\n", color: "dark_aqua"}}
+          r << %Q{{"text": "UUID:\\n", "color": "dark_blue"}}
+          r << %Q{{"text": "#{tmem.uuid || "???"}\\n\\n", "color": "dark_aqua"}}
 
           # links
-          r << %Q{{text: "\\n» kill player", color: "dark_purple", underlined: true, hoverEvent:{action:"show_text",value:"Click to kill player"},clickEvent:{action:"run_command", value:"!raw /kill #{tmem.nickname}"}}}
-          r << %Q{{text: "\\n» kick player", color: "dark_purple", underlined: true, hoverEvent:{action:"show_text",value:"Click to kick player"},clickEvent:{action:"run_command", value:"!raw /kick #{tmem.nickname}"}}}
-          r << %Q{{text: "\\n\\n» ban player\\n", color: "dark_red", underlined: true, hoverEvent:{action:"show_text",value:"Click to ban player"},clickEvent:{action:"run_command", value:"!raw /ban #{tmem.nickname}"}}}
+          r << %Q{{"text": "\\n» kill player", "color": "dark_purple", "underlined": true, "hoverEvent":{"action":"show_text","value":"Click to kill player"},"clickEvent":{"action":"run_command", "value":"!raw /kill #{tmem.nickname}"}}}
+          r << %Q{{"text": "\\n» kick player", "color": "dark_purple", "underlined": true, "hoverEvent":{"action":"show_text","value":"Click to kick player"},"clickEvent":{"action":"run_command", "value":"!raw /kick #{tmem.nickname}"}}}
+          r << %Q{{"text": "\\n\\n» ban player\\n", "color": "dark_red", "underlined": true, "hoverEvent":{"action":"show_text","value":"Click to ban player"},"clickEvent":{"action":"run_command", "value":"!raw /ban #{tmem.nickname}"}}}
         end.join("\n")
       end
 

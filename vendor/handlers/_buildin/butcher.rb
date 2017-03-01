@@ -62,11 +62,11 @@ module Mcl
         when "a", "arrow", "arrows"
           acl_verify(player, :mod)
           msg = "arrows"
-          butch_e(player, radius, %w[Arrow])
+          butch_e(player, radius, %w[Arrow SpectralArrow])
         when "pr", "projectile", "projectiles"
           acl_verify(player, :mod)
           msg = "projectiles"
-          butch_e(player, radius, %w[Arrow Snowball Fireball SmallFireball WitherSkull])
+          butch_e(player, radius, %w[Arrow SpectralArrow Snowball Fireball SmallFireball WitherSkull])
         else
           tellm(player, {text: "p/players [rad]", color: "gold"}, {text: " kills players", color: "reset"})
           tellm(player, {text: "h/hostile [rad]", color: "gold"}, {text: " kills hostile mobs", color: "reset"})

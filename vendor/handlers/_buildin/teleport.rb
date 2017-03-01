@@ -22,8 +22,8 @@ module Mcl
           $mcl.server.invoke com_book(player, *args[1..-1])
         else
           case args.count
-          when 3 then acl_verify(player, acl_levels[:others]) ; com_tp(player, args[0..2].join(" "))
-          when 4 then com_tp(args[0], args[1..3].join(" "))
+          when 3, 5 then acl_verify(player, acl_levels[:others]) ; com_tp(player, args[0..4].join(" "))
+          when 4, 6 then com_tp(args[0], args[1..5].join(" "))
           when 1, 2
             dir = args[1] || ">"
             if dir == ">"
@@ -39,7 +39,7 @@ module Mcl
             tellm(player, {text: "!tp book [>|<]", color: "gold"}, {text: " gives you a teleport book for both or given direction", color: "reset"})
             tellm(player, {text: "!tp <target> [>|<]", color: "gold"}, {text: " teleports you to target or target to you", color: "reset"})
             tellm(player, {text: "!tp <p1> <p2>", color: "gold"}, {text: " teleports p1 to p2", color: "reset"})
-            tellm(player, {text: "!tp [target] <x> <y> <z>", color: "gold"}, {text: " teleports you or target to position", color: "reset"})
+            tellm(player, {text: "!tp [target] <x> <y> <z> [<y-rot> <x-rot>]", color: "gold"}, {text: " teleports you or target to position", color: "reset"})
           end
         end
       end
@@ -66,9 +66,9 @@ module Mcl
             sp = []
             page_players.each_with_index do |p, i|
               if p == "-"
-                sp << %Q{{text:"Teleport X => me\\n", color:"red", bold: true}}
+                sp << %Q{{"text":"Teleport X => me\\n", "color":"red", "bold": true}}
               else
-                sp << %Q{{text:"#{p}\\n", color:"#{i % 2 == 0 ? "blue" : "dark_blue"}", hoverEvent:{action:"show_text", value: "TP #{p} to me"}, clickEvent:{action:"run_command", value: "!tp #{p} <"}}}
+                sp << %Q{{"text":"#{p}\\n", "color":"#{i % 2 == 0 ? "blue" : "dark_blue"}", "hoverEvent":{"action":"show_text", "value": "TP #{p} to me"}, "clickEvent":{"action":"run_command", "value": "!tp #{p} <"}}}
               end
             end
             pages << sp.join("\n")
@@ -81,9 +81,9 @@ module Mcl
             sp = []
             page_players.each_with_index do |p, i|
               if p == "-"
-                sp << %Q{{text:"Teleport me => X\\n", color:"red", bold: true}}
+                sp << %Q{{"text":"Teleport me => X\\n", "color":"red", "bold": true}}
               else
-                sp << %Q{{text:"#{p}\\n", color:"#{i % 2 == 0 ? "blue" : "dark_blue"}", hoverEvent:{action:"show_text", value: "TP me to #{p}"}, clickEvent:{action:"run_command", value: "!tp #{p}"}}}
+                sp << %Q{{"text":"#{p}\\n", color:"#{i % 2 == 0 ? "blue" : "dark_blue"}", "hoverEvent":{"action":"show_text", "value": "TP me to #{p}"}, "clickEvent":{"action":"run_command", "value": "!tp #{p}"}}}
               end
             end
             pages << sp.join("\n")

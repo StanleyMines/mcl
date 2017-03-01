@@ -132,7 +132,7 @@ module Mcl
         @command_acls = {}
         @command_names = {}
         if load_files
-          files = Dir["#{ROOT}/lib/mcl/handlers/**/*.rb"] + Dir["#{ROOT}/vendor/handlers/**/*.rb"]
+          files = (Dir["#{ROOT}/lib/mcl/handlers/**{,/*/**}/*.rb"] + Dir["#{ROOT}/vendor/handlers/**{,/*/**}/*.rb"]).uniq.sort
           files.reject do |file|
             file.gsub("#{ROOT}/vendor/handlers/", "").split("/").any?{|fp| fp.start_with?("__") }
           end.each{|f| load f }
@@ -155,6 +155,7 @@ module Mcl
           unless @console_server.halting
             log.debug "[SHUTDOWN] Stopping console socket server..."
             @console_server.shutdown!
+            @log.remove_target @console_server.log
           end
         end
 

@@ -41,6 +41,7 @@ module Mcl
       register_slapbread(:mod)
       register_slaystick(:mod)
       register_lootbrick(:mod)
+      register_collect(:mod)
     end
 
     def register_l0 acl_level, acl_level_others
@@ -69,8 +70,20 @@ module Mcl
           trawt(player, "give", {text: "!give requires at least one argument!", color: "red"})
         elsif args.count == 1
           $mcl.server.invoke "/execute #{player} ~ ~ ~ /give #{player} #{args.join(" ")}"
+        elsif args.count == 2 && args[1].to_i != 0
+          stacks = args[1].to_i / 64
+          rest = args[1].to_i % 64
+          stacks.times{ $mcl.server.invoke "/execute #{player} ~ ~ ~ /give #{player} #{args[0]} 64" }
+          $mcl.server.invoke "/execute #{player} ~ ~ ~ /give #{player} #{args[0]} #{rest}" if rest > 0
         else
-          $mcl.server.invoke "/execute #{player} ~ ~ ~ /give #{args.join(" ")}"
+          if args.last.to_i != 0
+            stacks = args.last.to_i / 64
+            rest = args.last.to_i % 64
+            stacks.times{ $mcl.server.invoke "/execute #{player} ~ ~ ~ /give #{args[0]} #{args[1]} 64" }
+            $mcl.server.invoke "/execute #{player} ~ ~ ~ /give #{args[0]} #{args[1]} #{rest}" if rest > 0
+          else
+            $mcl.server.invoke "/execute #{player} ~ ~ ~ /give #{args.join(" ")}"
+          end
         end
       end
     end
@@ -101,7 +114,7 @@ module Mcl
 
     def register_minecart acl_level
       register_command :minecart, desc: "summons a minecart above your or target's head", acl: acl_level do |player, args|
-        $mcl.server.invoke "/execute #{args.first || player} ~ ~ ~ summon Minecart ~ ~2 ~"
+        $mcl.server.invoke "/execute #{args.first || player} ~ ~ ~ summon MinecartRideable ~ ~2 ~"
       end
     end
 
@@ -192,6 +205,28 @@ module Mcl
       register_command :lootbrick, desc: "gives you a loot brick", acl: acl_level do |player, args|
         boost = args.first || 255
         $mcl.server.invoke %{/give #{args.second || player} minecraft:brick 1 0 {HideFlags:31,display:{Name:"Lootbrick"},ench:[{id:21,lvl:#{boost}}]}}
+      end
+    end
+
+    def register_collect acl_level
+      register_command :collect, desc: "teleport items in radius (default 10) to you", acl: acl_level do |player, args|
+        radius = args.detect{|a| a.to_s =~ /\A[\-0-9]+\z/ }
+        radius = nil if radius == "-"
+        args.delete(radius) if radius
+        radius ||= 10
+        target = args.first || player
+
+        msg, cmd = "Collected items", %{/execute #{target} ~ ~ ~ tp @e[type=Item}
+
+        if radius
+          cmd << %{,r=#{radius}}
+          msg << " in a #{radius} block radius around you"
+        end
+        cmd << %{] #{target}}
+        msg << "!"
+
+        $mcl.server.invoke(cmd)
+        trawm(target, {text: msg, color: "yellow"})
       end
     end
   end

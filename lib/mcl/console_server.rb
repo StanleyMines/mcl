@@ -1,6 +1,7 @@
 module Mcl
   class ConsoleServer
     attr_reader :app, :server, :socket, :sessions, :halting, :log
+    AccessViolationError = Class.new(RuntimeError)
 
     def initialize app
       @app = app
@@ -12,9 +13,14 @@ module Mcl
       end.flatten
     end
 
+    def authentication_required?
+      cfg = @app.config["console_authentication"]
+      bind = !["127.0.0.1", "localhost", "::1"].include?(bind_ip)
+      cfg || (@socket.is_a?(UNIXServer) ? false : bind)
+    end
+
     def bind_ip
-      # DO NOT CHANGE THIS HERE!
-      "127.0.0.1"
+      @app.config["console_bind"] || "127.0.0.1"
     end
 
     def new_session *a
@@ -81,8 +87,8 @@ module Mcl
           @app.log.debug "[ConsoleServer-FAILSAFE] something went wrong in the session termination process, killed!"
         end
         @server.kill
-        @socket.close
-        File.unlink(sock_info_path)
+        @socket.close if @socket rescue IOError
+        File.unlink(sock_info_path) if File.exist?(sock_info_path)
         File.unlink(socket_path) if @socket.is_a?(UNIXSocket) && File.exist?(socket_path) && File.socket?(socket_path)
       end
     end
@@ -114,6 +120,7 @@ module Mcl
     end
 
     def spawn_server
+      return unless @socket
       Thread.main[:mcl_console_server] = @server = Thread.new do
         loop do
           Thread.current.abort_on_exception = true if @app.config["dev"]
@@ -131,7 +138,7 @@ module Mcl
                   begin
                     session = new_session(self, Thread.current, sock)
                     @sessions << session
-                    session.helo!
+                    session.start!
                   rescue
                     client_id = session.client_id rescue nil
                     app.log.warn("[ConsoleServer] session `#{client_id || "unknown"}' prematurely terminated: #{$!.class.name}: #{$!.message}")

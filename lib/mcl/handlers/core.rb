@@ -3,6 +3,7 @@ module Mcl
   class HMMclCore < Handler
     def setup
       early_console_server_shutdown
+      register_ping(:guest, :mod)
       register_sprop(:root)
       register_danger(:admin)
       register_help(:guest)
@@ -18,7 +19,7 @@ module Mcl
     end
 
     def early_console_server_shutdown
-      app.ipc_early do
+      app.ipc_early :early_console_server_shutdown do
         app.log.debug "[SHUTDOWN] Stopping console socket server..."
         app.console_server.shutdown!
       end
@@ -28,6 +29,16 @@ module Mcl
       register_command :danger, desc: "enable danger mode for you to bypass security limits", acl: acl_level do |player, args|
         pmemo(player)[:danger_mode] = strbool(args.first) if args.any?
         trawm(player, {text: "Danger mode ", color: "gold"}, pmemo(player)[:danger_mode] ? {text: "ENABLED", color: "red"} : {text: "disabled", color: "green"})
+      end
+    end
+
+    def register_ping acl_level, acl_level_target
+      register_command :ping, desc: "pongs you back and advertises self self self self self....", acl: acl_level do |player, args|
+        acl_verify(player, acl_level_target) if args.first
+        target = args.first || player
+        trawt(target, "MCL", {text: "Minecraft Listener (short MCL) here!", color: "gold", bold: true})
+        trawt(target, "MCL", {text: "I'm your loyal server wrapper written in ", color: "yellow"}, {text: "Ruby", color: "aqua"}, {text: "!", color: "yellow"})
+        trawt(target, "MCL", {text: "Find me @ ", color: "yellow"}, {text: "https://mcl.breitzeit.de", underlined: true, color: "", hoverEvent: {action: "show_text", value: "click me!"}, clickEvent:{action: "open_url", value: "https://mcl.breitzeit.de"}})
       end
     end
 
@@ -45,8 +56,8 @@ module Mcl
                 next if v == :comment
                 x += k.to_s.length > 20 ? 2 : 1
 
-                val = v.blank? ? %Q{"-blank-", color: "gray", italic: true} : %Q{"#{v}"}
-                bs << %Q{{text: "#{k}\\n", color: "#{i % 2 == 0 ? :blue : :dark_blue}", hoverEvent:{action:"show_text",value:#{val}},clickEvent:{action:"run_command", value:"!sprop #{k}"}}}
+                val = v.blank? ? %Q{"-blank-", "color": "gray", "italic": true} : %Q{"#{v}"}
+                bs << %Q{{"text": "#{k}\\n", "color": "#{i % 2 == 0 ? :blue : :dark_blue}", "hoverEvent":{"action":"show_text","value":#{val}},"clickEvent":{"action":"run_command", "value":"!sprop #{k}"}}}
                 if x >= 13
                   b << bs.join("\n")
                   x, bs = 0, []
@@ -152,14 +163,14 @@ module Mcl
     end
 
     def register_mclshell acl_level
-      register_command(:mclshell, desc: "ONLY FOR DEVELOPMENT (will freeze MCL)", acl: acl_level) { binding.pry }
+      register_command(:mclshell, desc: "ONLY FOR DEVELOPMENT (will freeze MCL)", acl: acl_level) {|player, args, handler, opt| binding.pry }
     end
 
     def register_mclupdate acl_level
       register_command :mclupdate, desc: "updates and reloads MCL via git", acl: acl_level do |player, args|
         traw("@a", "[MCL] Updating MCL...", color: "gold")
         traw("@a", "[MCL] git was: #{git_message}", color: "gold")
-        if system(%{cd "#{ROOT}" && git pull && bundle install --deployment})
+        if system(%{cd "#{ROOT}" && git checkout Gemfile.lock && git pull && bundle install})
           traw("@a", "[MCL] git now: #{git_message}", color: "gold")
           if args[0].present?
             announce_server_restart
